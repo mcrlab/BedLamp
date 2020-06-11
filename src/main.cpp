@@ -11,7 +11,7 @@
 // -----------------------------------------------------------------------------
 
 #define SERIAL_BAUDRATE     115200
-#define ID_BED              "Bed Lamp"
+#define ID_NAME              "Bed Lamp"
 #define DATA_PIN            5
 #define LED_TYPE            WS2811
 #define COLOR_ORDER         GRB
@@ -64,13 +64,13 @@ void setup() {
     fauxmo.setPort(80);
     fauxmo.enable(true);
 
-    fauxmo.addDevice(ID_BED);
+    fauxmo.addDevice(ID_NAME);
 
     fauxmo.onSetState([](unsigned char device_id, const char * device_name, bool state, unsigned char value) {
                 
         Serial.printf("[MAIN] Device #%d (%s) state: %s value: %d\n", device_id, device_name, state ? "ON" : "OFF", value);
 
-        if (strcmp(device_name, ID_BED)==0) {
+        if (strcmp(device_name, ID_NAME)==0) {
             FastLED.setBrightness(value);
         } 
         
