@@ -18,6 +18,7 @@
 #define NUM_LEDS            60
 #define BRIGHTNESS          128
 #define FRAMES_PER_SECOND   120
+#define WEB_APP_URL          "http://bed-lamp-iot.s3.eu-west-2.amazonaws.com/build/index.html"
 
 char light_name[40];
 CRGB leds[NUM_LEDS];
@@ -76,7 +77,7 @@ void handleRoot() {
   HTTPClient http;  //Declare an object of class HTTPClient
   String payload;
 
-  http.begin("http://192.168.1.85:5000/");  //Specify request destination
+  http.begin(WEB_APP_URL);  //Specify request destination
   int httpCode = http.GET();                                                                  //Send the request
  
   if (httpCode > 0) { //Check the returning code
@@ -94,14 +95,14 @@ void updateLight() {
   deserializeJson(doc, server.arg("plain"));
   outputState = doc["status"];
   Serial.println(server.arg("plain"));
-  server.send ( 200, "text/json", "{success:true}" );
+  server.send ( 200, "text/json", "{\"success\":true}" );
 }
 
 void getLight(){
   if (outputState) {
-    server.send ( 200, "text/json", "{status:true}" );
+    server.send ( 200, "text/json", "{\"status\":true}" );
   } else {
-     server.send ( 200, "text/json", "{status:false}" );
+     server.send ( 200, "text/json", "{\"status\":false}" );
   }
 }
 
