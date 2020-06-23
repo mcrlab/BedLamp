@@ -4,6 +4,7 @@
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPClient.h>
+#include <ESP8266httpUpdate.h>
 #include <ESP8266mDNS.h>
 #include <WiFiManager.h> 
 #include <ArduinoJson.h>
@@ -19,6 +20,7 @@
 #define BRIGHTNESS          128
 #define FRAMES_PER_SECOND   120
 #define WEB_APP_URL          "http://bed-lamp-iot.s3.eu-west-2.amazonaws.com/build/index.html"
+#define FIRMWARE_URL        ""
 
 char light_name[40];
 CRGB leds[NUM_LEDS];
@@ -27,6 +29,7 @@ uint8_t gHue = 0; // rotating "base color" used by many of the patterns
 ESP8266WebServer server(80);
 String header;
 boolean outputState = false;
+int brightness = 255;
 
 
 const unsigned long CONNECT_TIMEOUT = 10; // Wait 10 Seconds  to connect to the real AP before trying to boot the local AP
@@ -36,6 +39,8 @@ void handleRoot();
 void updateLight();
 void getLight();
 void handleNotFound();
+void handleUpdate();
+
 
 void setup() {
     Serial.begin(SERIAL_BAUDRATE);
@@ -67,6 +72,7 @@ void setup() {
     server.on("/", HTTP_GET, handleRoot);
     server.on("/led", HTTP_GET, getLight);
     server.on("/led", HTTP_POST, updateLight);
+    server.on("/update", HTTP_GET, handleUpdate);
     server.onNotFound(handleNotFound);
     server.begin();
 
@@ -105,6 +111,23 @@ void getLight(){
      server.send ( 200, "text/json", "{\"status\":false}" );
   }
 }
+void handleUpdate(){
+  Serial.println("Updating...");
+  server.send(200, "text/json", "{\"success\": true}");
+
+  t_httpUpdate_return ret = ESPhttpUpdate.update("192.168.1.85", 5000, "/firmware.bin");
+  switch(ret) {
+      case HTTP_UPDATE_FAILED:
+          Serial.println("[update] Update failed.");
+          break;
+      case HTTP_UPDATE_NO_UPDATES:
+          Serial.println("[update] Update no Update.");
+          break;
+      case HTTP_UPDATE_OK:
+          Serial.println("[update] Update ok."); // may not be called since we reboot the ESP
+          break;
+  }
+}
 
 void handleNotFound(){
   server.send(404, "text/plain", "404: Not found"); // Send HTTP status 404 (Not Found) when there's no handler for the URI in the request
@@ -126,90 +149,13 @@ void sinelon()
 
 
 void loop() {
-
-/*
- WiFiClient client = server.available();   // Listen for incoming clients
-
-  if (client) {                             // If a new client connects,
-    Serial.println("New Client.");          // print a message out in the serial port
-    String currentLine = "";                // make a String to hold incoming data from the client
-    while (client.connected()) {            // loop while the client's connected
-      if (client.available()) {             // if there's bytes to read from the client,
-        char c = client.read();             // read a byte, then
-        Serial.write(c);                    // print it out the serial monitor
-        header += c;
-        if (c == '\n') {                    // if the byte is a newline character
-          // if the current line is blank, you got two newline characters in a row.
-          // that's the end of the client HTTP request, so send a response:
-          if (currentLine.length() == 0) {
-            // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
-            // and a content-type so the client knows what's coming, then a blank line:
-            client.println("HTTP/1.1 200 OK");
-            client.println("Content-type:text/html");
-            client.println("Connection: close");
-            client.println();
-            
-            // turns the GPIOs on and off
-            if (header.indexOf("GET /output/on") >= 0) {
-              Serial.println("Output on");
-              outputState = true;
-            } else if (header.indexOf("GET /output/off") >= 0) {
-              Serial.println("Output off");
-              outputState = false;
-            }
-            
-            // Display the HTML web page
-            client.println("<!DOCTYPE html><html>");
-            client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-            client.println("<link rel=\"icon\" href=\"data:,\">");
-            // CSS to style the on/off buttons 
-            // Feel free to change the background-color and font-size attributes to fit your preferences
-            client.println("<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}");
-            client.println(".button { background-color: #195B6A; border: none; color: white; padding: 16px 40px;");
-            client.println("text-decoration: none; font-size: 30px; margin: 2px; cursor: pointer;}");
-            client.println(".button2 {background-color: #77878A;}</style></head>");
-            
-            // Web Page Heading
-            client.println("<body><h1>ESP8266 Web Server</h1>");
-            
-            // Display current state, and ON/OFF buttons for the defined GPIO  
-           // client.println("<p>Output - State " + outputState + "</p>");
-            // If the outputState is off, it displays the ON button       
-            if (!outputState) {
-              client.println("<p><a href=\"/output/on\"><button class=\"button\">ON</button></a></p>");
-            } else {
-              client.println("<p><a href=\"/output/off\"><button class=\"button button2\">OFF</button></a></p>");
-            }                  
-            client.println("</body></html>");
-            
-            // The HTTP response ends with another blank line
-            client.println();
-            // Break out of the while loop
-            break;
-          } else { // if you got a newline, then clear currentLine
-            currentLine = "";
-          }
-        } else if (c != '\r') {  // if you got anything else but a carriage return character,
-          currentLine += c;      // add it to the end of the currentLine
-        }
-      }
-    }
-    // Clear the header variable
-    header = "";
-    // Close the connection
-    client.stop();
-    Serial.println("Client disconnected.");
-    Serial.println("");
+  server.handleClient();                 
+  if(!outputState){
+    fill_solid( leds, NUM_LEDS, CRGB(0,0,0));
+  } else {
+    rainbow();
   }
- */
-    //fill_rainbow( leds, NUM_LEDS, gHue, 7);  
-    server.handleClient();                 
-    if(!outputState){
-      fill_solid( leds, NUM_LEDS, CRGB(0,0,0));
-    } else {
-      rainbow();
-    }
-    FastLED.show();  
-    FastLED.delay(1000/FRAMES_PER_SECOND); 
-    EVERY_N_MILLISECONDS( 20 ) { gHue++; }
+  FastLED.show();  
+  FastLED.delay(1000/FRAMES_PER_SECOND); 
+  EVERY_N_MILLISECONDS( 20 ) { gHue++; }
 }
